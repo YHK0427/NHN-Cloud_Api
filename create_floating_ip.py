@@ -37,7 +37,7 @@ def create_floating_ip(
         response = requests.post(url, headers=headers, data=json.dumps(payload))
         response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
 
-        if response.status_code == 200: # Assuming 200 OK for successful creation
+        if response.status_code == 201: # 201 Created for successful creation
             fip_info = response.json().get('floatingip', {})
             print(f"✅ 플로팅 IP 생성 성공! (Region: {region_code})")
             print(f" - ID: {fip_info.get('id')}")

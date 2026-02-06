@@ -60,7 +60,7 @@ def get_token():
     print("No valid cached token found. Fetching a new token from API.")
     url = "https://api-identity-infrastructure.nhncloudservice.com"
     uri = "/v2.0/tokens"
-    tenent_id = "0cc0040eaa0044bc99f8a7f4bedc233b"
+    tenant_id = "YOUR_TENANT_ID_HERE"
     body = {
         "auth": {
             "tenantId": tenent_id,
