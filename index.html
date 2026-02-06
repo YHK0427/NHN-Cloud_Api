@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NHN Cloud API 자동화 모듈</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+        
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --background-color: #f8f9fa;
+            --text-color: #333;
+            --card-bg-color: #ffffff;
+            --card-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 4rem 0;
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+        }
+
+        header h1 {
+            font-size: 2.8rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        header p {
+            font-size: 1.2rem;
+            font-weight: 300;
+        }
+
+        .card {
+            background-color: var(--card-bg-color);
+            border-radius: 8px;
+            box-shadow: var(--card-shadow);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card h2 {
+            color: var(--primary-color);
+            font-size: 2rem;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 0.5rem;
+            margin-top: 0;
+        }
+
+        .features-list {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .features-list li {
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .features-list li::before {
+            content: '✅';
+            margin-right: 10px;
+            color: var(--primary-color);
+        }
+
+        .code-block {
+            background-color: #e9ecef;
+            padding: 1rem;
+            border-radius: 5px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .highlight {
+            background-color: #e8f3ff;
+            padding: 0.2rem 0.5rem;
+            border-radius: 5px;
+            color: #0056b3;
+            font-weight: 500;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem 0;
+            color: var(--secondary-color);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>NHN Cloud API 자동화 모듈</h1>
+        <p><code>nhn_api_module</code>을 사용한 파이썬 기반 인프라 자동화</p>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <h2>🚀 이 페이지에 대하여</h2>
+            <p>
+                이 웹페이지는 <span class="highlight">`nhn_api_module`</span> 파이썬 모듈을 사용하여 자동으로 프로비저닝된 NHN Cloud 인스턴스에서 호스팅되고 있습니다.
+                단일 파이썬 스크립트 실행을 통해 VPC, 서브넷, 인터넷 게이트웨이, 보안 그룹, 인스턴스 생성 및 Floating IP 연결까지 모든 과정이 자동으로 처리되었습니다.
+            </p>
+        </div>
+
+        <div class="card">
+            <h2>✨ `nhn_api_module`의 핵심 기능</h2>
+            <ul class="features-list">
+                <li><strong>모듈성:</strong> 인증, 네트워킹, 컴퓨트, 보안 등 기능별로 모듈이 분리되어 있어 재사용 및 유지보수가 용이합니다.</li>
+                <li><strong>직관성:</strong> 복잡한 API 호출을 간단하고 명확한 함수로 추상화하여 누구나 쉽게 NHN Cloud 리소스를 관리할 수 있습니다.</li>
+                <li><strong>자동화:</strong> 스크립트 기반으로 인프라를 코드로 관리(IaC)할 수 있어 반복적인 작업을 자동화하고 휴먼 에러를 줄입니다.</li>
+                <li><strong>보안:</strong> <code>.env</code> 파일을 통해 민감한 자격 증명을 소스 코드와 안전하게 분리하여 관리합니다.</li>
+            </ul>
+        </div>
+        
+        <div class="card">
+            <h2>🛠️ 작동 방식</h2>
+            <p>
+                이 웹 서버는 <code>examples/provision_web_server.py</code> 예제 스크립트를 통해 생성되었습니다. 스크립트의 주요 실행 흐름은 다음과 같습니다:
+            </p>
+            <div class="code-block">
+1. `.env` 파일에서 API 자격 증명 로드
+2. `auth.get_token()`으로 인증 토큰 발급
+3. `networking.create_vpc()` 및 `networking.create_vpc_subnet()`으로 VPC 네트워크 구성
+4. `networking.create_internet_gateway()` 및 `networking.attach_gateway_to_routing_table()`으로 인터넷 연결 설정
+5. `security.create_security_group()` 및 `security.create_security_group_rule()`으로 방화벽 설정
+6. `compute.create_instance()`로 Ubuntu 인스턴스 생성 (이때 이 HTML 파일이 User Data로 전달됨)
+7. `networking.create_floating_ip()` 및 `networking.associate_floating_ip()`으로 공인 IP 할당 및 연결
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>본 페이지는 NHN Cloud API 모듈화 예제의 일부로 자동 생성되었습니다.</p>
+    </footer>
+</body>
+</html>

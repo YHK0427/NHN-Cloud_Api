@@ -73,17 +73,14 @@ def main():
     volume_size = 30
     
     # Nginx 설치 User Data 스크립트
-    html_content = """<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>NHN Cloud Web Server</title>
-</head>
-<body>
-    <h1>🚀 Welcome to NHN Cloud!</h1>
-    <p>이 웹 서버는 'nhn_api_module'을 사용하여 자동으로 생성되었습니다.</p>
-</body>
-</html>"""
+    try:
+        # 프로젝트 루트에 있는 index.html 파일을 읽어옵니다.
+        with open(os.path.join(project_root, 'index.html'), 'r', encoding='utf-8') as f:
+            html_content = f.read()
+    except FileNotFoundError:
+        print("🚨 오류: 프로젝트 루트에 index.html 파일이 없습니다. 스크립트를 중단합니다.")
+        return
+        
     encoded_html = base64.b64encode(html_content.encode('utf-8')).decode('utf-8')
     nginx_user_data_script = f"""#!/bin/bash
 exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
