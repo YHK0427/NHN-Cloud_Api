@@ -1,4 +1,6 @@
 import requests
+import os
+from dotenv import load_dotenv
 from get_token import get_token
 # from get_my_instance import get_my_instance # Not directly used in this orchestration
 from create_vpc import create_vpc
@@ -16,22 +18,36 @@ from create_internet_gateway import create_internet_gateway
 from attach_gateway_to_routing_table import attach_gateway_to_routing_table
 
 def main():
-    # Import configurations
+    load_dotenv() # Load variables from .env file
+
+    # Import non-sensitive configurations from config.py
     from config import (
-        region_code, tenant_id,
+        region_code,
         vpc_name, vpc_cidr, subnet_name, subnet_cidr,
-        sg_name, sg_description, my_ip_for_ssh,
-        instance_name, image_ref, key_name, volume_size,
+        sg_name, sg_description,
+        instance_name, image_ref, volume_size,
         nginx_user_data_script
     )
+
+    # Load sensitive data from environment variables
+    tenant_id = os.getenv("TENANT_ID")
+    my_ip_for_ssh = os.getenv("MY_IP_FOR_SSH")
+    key_name = os.getenv("KEY_NAME")
+
+    # --- 0. Validate Environment Variables ---
+    if not all([tenant_id, my_ip_for_ssh, key_name]):
+        print("🚨 Error: TENANT_ID, MY_IP_FOR_SSH, or KEY_NAME environment variables not set.")
+        print("    Please create a .env file from .env.example and fill in your values.")
+        return
 
     print("--- Starting Network Resource Orchestration ---")
     
     # --- 1. Get Token ---
-    auth_token = get_token()["token_id"]
-    if not auth_token:
-        print("🚨 인증 토큰을 가져오지 못했습니다. 스크립트를 종료합니다.")
+    token_data = get_token()
+    if not token_data:
+        # get_token() already prints an error, so we can just exit.
         return
+    auth_token = token_data["token_id"]
 
     # --- 2. Create VPC ---
     print(f"\nAttempting to create VPC '{vpc_name}'...")
@@ -54,8 +70,6 @@ def main():
     vpc_details = get_vpc_details(auth_token, vpc_id, region_code)
     routing_table_id = None
     if vpc_details and vpc_details.get('subnets'):
-        # Assuming the first subnet created with the VPC is the one we care about for routing
-        # The documentation for GET /v2.0/vpcs/{vpcId} shows routingtable.id is under vpc.subnets[0].routingtable.id
         routing_table_id = vpc_details['subnets'][0].get('routingtable', {}).get('id')
     
     if not routing_table_id:
@@ -72,7 +86,7 @@ def main():
     print(f"✅ 외부 네트워크 ID를 성공적으로 조회했습니다: {external_network_id}")
 
     # --- 6. Create Internet Gateway ---
-    ig_name = f"{vpc_name}-ig" # Use VPC name for IG name
+    ig_name = f"{vpc_name}-ig"
     print(f"\nAttempting to create Internet Gateway '{ig_name}'...")
     internet_gateway_id = create_internet_gateway(auth_token, ig_name, external_network_id, region_code)
     if not internet_gateway_id:
@@ -97,7 +111,6 @@ def main():
     print(f"✅ Security Group '{sg_name}' 생성 성공. ID: {security_group_id}")
 
     # --- 9. Add Security Group Rules ---
-    # HTTP (80) Rule
     print("\n--- Adding HTTP (Port 80) Ingress Rule ---")
     rule_http_id = create_security_group_rule(
         auth_token,
@@ -106,7 +119,7 @@ def main():
         protocol="tcp",
         port_range_min=80,
         port_range_max=80,
-        remote_ip_prefix=my_ip_for_ssh.split('/')[0], # Allow from my_ip_for_ssh (first part of CIDR)
+        remote_ip_prefix=my_ip_for_ssh.split('/')[0],
         description="Allow HTTP access",
         region_code=region_code
     )
@@ -115,61 +128,49 @@ def main():
     else:
         print("🚨 HTTP Ingress Rule 생성 실패.")
 
-    # SSH (22) Rule
-    if tenant_id == "YOUR_TENANT_ID_HERE": # Check for placeholder tenant_id from config
-        print("\n⚠️ 경고: 'tenant_id'를 실제 테넌트 ID로 변경해야 SSH 규칙을 생성할 수 있습니다.")
-        print("    SSH 규칙 생성 단계를 건너뜁니다.")
-    elif my_ip_for_ssh == "YOUR_PUBLIC_IP_CIDR_HERE": # This check should be against the config variable
-        print("\n⚠️ 경고: 'my_ip_for_ssh'를 실제 공인 IP/CIDR로 변경해야 SSH 규칙을 생성할 수 있습니다.")
-        print("    SSH 규칙 생성 단계를 건너뜁니다.")
+    print("\n--- Adding SSH (Port 22) Ingress Rule ---")
+    rule_ssh_id = create_security_group_rule(
+        auth_token,
+        security_group_id,
+        direction="ingress",
+        protocol="tcp",
+        port_range_min=22,
+        port_range_max=22,
+        remote_ip_prefix=my_ip_for_ssh,
+        description="Allow SSH access from specified IP",
+        region_code=region_code
+    )
+    if rule_ssh_id:
+        print(f"✅ SSH Ingress Rule 생성 성공. ID: {rule_ssh_id}")
     else:
-        print("\n--- Adding SSH (Port 22) Ingress Rule ---")
-        rule_ssh_id = create_security_group_rule(
-            auth_token,
-            security_group_id,
-            direction="ingress",
-            protocol="tcp",
-            port_range_min=22,
-            port_range_max=22,
-            remote_ip_prefix=my_ip_for_ssh,
-            description="Allow SSH access from specified IP",
-            region_code=region_code
-        )
-        if rule_ssh_id:
-            print(f"✅ SSH Ingress Rule 생성 성공. ID: {rule_ssh_id}")
-        else:
-            print("🚨 SSH Ingress Rule 생성 실패.")
+        print("🚨 SSH Ingress Rule 생성 실패.")
 
     # --- 10. List Flavors & Select Lowest Spec ---
     print("\n--- Listing Available Flavors (Instance Types) ---")
+    flavors = list_flavors(auth_token, tenant_id, region_code)
     selected_flavor_id = None
-    if tenant_id == "YOUR_TENANT_ID_HERE": # Check for placeholder tenant_id from config
-        print("\n⚠️ 경고: 'tenant_id'를 실제 테넌트 ID로 변경해야 플레이버 목록을 정확히 조회할 수 있습니다.")
-        print("    플레이버 목록 조회 단계를 건너뜁니다.")
+    if flavors:
+        flavors_sorted = sorted(flavors, key=lambda f: f['name']) 
+        for f in flavors_sorted:
+            if f['name'] == "m2.c1m2":
+                selected_flavor_id = f['id']
+                print(f"✅ 'm2.c1m2' 플레이버 ID를 찾았습니다: {selected_flavor_id}")
+                break
+        
+        if not selected_flavor_id and flavors_sorted:
+            selected_flavor_id = flavors_sorted[0]['id']
+            print(f"✅ 'm2.c1m2' 플레이버를 찾지 못하여, 가장 낮은 스펙으로 추정되는 플레이버 '{flavors_sorted[0]['name']}'을 선택합니다. ID: {selected_flavor_id}")
+        elif not selected_flavor_id:
+            print("\n🚨 플레이버 목록 조회는 성공했으나, 적절한 플레이버를 찾지 못했습니다.")
     else:
-        flavors = list_flavors(auth_token, tenant_id, region_code)
-        if flavors:
-            flavors_sorted = sorted(flavors, key=lambda f: f['name']) 
-            for f in flavors_sorted:
-                if f['name'] == "m2.c1m2":
-                    selected_flavor_id = f['id']
-                    print(f"✅ 'm2.c1m2' 플레이버 ID를 찾았습니다: {selected_flavor_id}")
-                    break
-            
-            if not selected_flavor_id and flavors_sorted:
-                selected_flavor_id = flavors_sorted[0]['id']
-                print(f"✅ 'm2.c1m2' 플레이버를 찾지 못하여, 가장 낮은 스펙으로 추정되는 플레이버 '{flavors_sorted[0]['name']}'을 선택합니다. ID: {selected_flavor_id}")
-            elif not selected_flavor_id:
-                print("\n🚨 플레이버 목록 조회는 성공했으나, 적절한 플레이버를 찾지 못했습니다.")
-        else:
-            print("🚨 플레이버 목록 조회 실패 또는 사용 가능한 플레이버가 없습니다.")
+        print("🚨 플레이버 목록 조회 실패 또는 사용 가능한 플레이버가 없습니다.")
 
     print("\n--- Network Resource Orchestration Complete ---")
     
     # --- 11. Create Instance (Conditional) ---
     instance_id = None
     instance_port_id = None
-    if selected_flavor_id and vpc_id and subnet_id and security_group_id and key_name != "YOUR_KEYPAIR_NAME_HERE" and tenant_id != "YOUR_TENANT_ID_HERE":
+    if selected_flavor_id and vpc_id and subnet_id and security_group_id:
         print("\n--- Attempting to Create Instance ---")
         instance_id, instance_port_id = create_instance(
             auth_token,
@@ -178,8 +179,8 @@ def main():
             key_name,
             image_ref,
             selected_flavor_id,
-            subnet_id, # Use subnet_id for network connection
-            [sg_name], # Pass security group name for the instance
+            subnet_id,
+            [sg_name],
             nginx_user_data_script,
             region_code=region_code,
             volume_size=volume_size
@@ -189,16 +190,16 @@ def main():
         else:
             print(f"🚨 인스턴스 '{instance_name}' 생성 실패.")
     else:
-        print("\n⚠️ 인스턴스 생성 전 필수 설정 (tenant_id, key_name)을 완료해야 합니다. 인스턴스 생성을 건너뜁니다.")
+        print("\n⚠️ 인스턴스 생성에 필요한 리소스(Flavor, VPC, Subnet, Security Group)가 준비되지 않았습니다. 인스턴스 생성을 건너뜁니다.")
 
     # --- 12. Create Floating IP (Conditional) ---
     floating_ip_id = None
     floating_ip_address = None
-    if instance_id and instance_port_id and external_network_id and tenant_id != "YOUR_TENANT_ID_HERE":
+    if instance_id and instance_port_id and external_network_id:
         print("\n--- Attempting to Create Floating IP ---")
         fip_data = create_floating_ip(
             auth_token,
-            external_network_id, # Use external_network_id obtained earlier
+            external_network_id,
             region_code=region_code
         )
         if fip_data:
@@ -208,7 +209,7 @@ def main():
         else:
             print("🚨 플로팅 IP 생성 실패.")
     else:
-        print("\n⚠️ 플로팅 IP 생성 전 필수 설정 (instance_id, instance_port_id, external_network_id, tenant_id)을 완료해야 합니다. 플로팅 IP 생성을 건너뜁니다.")
+        print("\n⚠️ 플로팅 IP 생성에 필요한 리소스(Instance, Port, External Network)가 준비되지 않았습니다. 플로팅 IP 생성을 건너뜁니다.")
 
     # --- 13. Associate Floating IP (Conditional) ---
     if floating_ip_id and instance_port_id:
@@ -224,7 +225,7 @@ def main():
         else:
             print("🚨 플로팅 IP 연결 실패.")
     else:
-        print("\n⚠️ 플로팅 IP 연결 전 필수 설정 (floating_ip_id, instance_port_id)을 완료해야 합니다. 플로팅 IP 연결을 건너뜁니다.")
+        print("\n⚠️ 플로팅 IP 연결에 필요한 리소스(Floating IP, Instance Port)가 준비되지 않았습니다. 플로팅 IP 연결을 건너뜁니다.")
     
     print("\n--- Orchestration Final Summary ---")
     if floating_ip_address:

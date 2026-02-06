@@ -1,6 +1,10 @@
 import requests
 import json
 from datetime import datetime, timezone
+import os
+from dotenv import load_dotenv
+
+load_dotenv() # Load variables from .env file
 
 TOKEN_FILE = "token.json"
 
@@ -32,11 +36,6 @@ def parse_datetime(dt_str):
         dt_str = dt_str[:-1] + '+00:00'
     return datetime.fromisoformat(dt_str)
 
-
-
-
-
-
 def get_token():
     """
     Retrieves an authentication token.
@@ -60,13 +59,23 @@ def get_token():
     print("No valid cached token found. Fetching a new token from API.")
     url = "https://api-identity-infrastructure.nhncloudservice.com"
     uri = "/v2.0/tokens"
-    tenant_id = "YOUR_TENANT_ID_HERE"
+    
+    # Load sensitive data from environment variables
+    tenant_id = os.getenv("TENANT_ID")
+    username = os.getenv("API_USERNAME")
+    password = os.getenv("API_PASSWORD")
+
+    if not all([tenant_id, username, password]):
+        print("🚨 Error: TENANT_ID, API_USERNAME, or API_PASSWORD environment variables not set.")
+        print("    Please create a .env file from .env.example and fill in your credentials.")
+        return None
+
     body = {
         "auth": {
-            "tenantId": tenent_id,
+            "tenantId": tenant_id,
             "passwordCredentials": {
-                "username": "test04",
-                "password": "test123!@#"
+                "username": username,
+                "password": password
             }
         }
     }
@@ -90,4 +99,5 @@ def get_token():
 
 if __name__ == "__main__":
     token = get_token()
-    print(token)
+    if token:
+        print(token)

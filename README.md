@@ -57,69 +57,35 @@ nhn_api/
 ## 5. 전제 조건
 
 - Python 3.x
-- `requests` 라이브러리. pip를 사용하여 설치하세요:
+- `requests` 및 `python-dotenv` 라이브러리. pip를 사용하여 설치하세요:
   ```bash
-  pip install requests
+  pip install requests python-dotenv
   ```
 
 ## 6. 구성 (중요!)
 
-프로젝트를 실행하기 전에 다음 파일에서 개인 자격 증명 및 설정을 **반드시** 구성해야 합니다.
+이 프로젝트는 민감 정보를 `.env` 파일을 통해 관리합니다. 소스 코드를 직접 수정하는 대신 다음 단계를 따라 환경을 구성하세요.
 
-### a. `get_token.py` (인증 자격 증명)
+1.  **`.env` 파일 생성:**
+    프로젝트 루트 디렉터리에 있는 `.env.example` 파일을 `.env` 라는 이름으로 복사합니다.
 
-`get_token.py`를 열고 `body` 딕셔너리를 NHN Cloud API 자격 증명으로 수정합니다.
+2.  **`.env` 파일 수정:**
+    방금 생성한 `.env` 파일을 열고, 아래 변수들에 자신의 NHN Cloud 환경에 맞는 실제 값을 입력합니다.
 
-```python
-# get_token.py 내
-def get_token():
-    # ...
-    tenant_id = "YOUR_TENANT_ID_HERE" # <-- 이 값은 config.py에서 관리되므로 변경하지 마세요.
-    body = {
-        "auth": {
-            "tenantId": tenant_id, # `config.py`에서 임포트됩니다.
-            "passwordCredentials": {
-                "username": "test04",        # <-- 실제 API 사용자 이름으로 변경하세요
-                "password": "test123!@#"      # <-- 실제 API 비밀번호로 변경하세요
-            }
-        }
-    }
-    # ...
-```
+    ```dotenv
+    # .env 파일
 
-> **⚠️ 보안 경고:** 소스 코드에 자격 증명을 직접 하드코딩하는 것은 심각한 보안 위험입니다. 프로덕션 사용의 경우 환경 변수나 전용 비밀 관리 도구와 같은 더 안전한 방법을 사용하는 것을 강력히 권장합니다.
+    # NHN Cloud API Credentials
+    API_USERNAME="YOUR_API_USERNAME"
+    API_PASSWORD="YOUR_API_PASSWORD"
+    TENANT_ID="YOUR_TENANT_ID"
 
-### b. `config.py` (리소스 구성)
+    # Environment-specific settings
+    MY_IP_FOR_SSH="YOUR_PUBLIC_IP/32"
+    KEY_NAME="YOUR_KEYPAIR_NAME"
+    ```
 
-`config.py`를 열고 다음 변수를 NHN Cloud 프로젝트에 맞게 구성합니다.
-
-```python
-# config.py 내
-
-# --- Configuration ---
-region_code = "kr1" # 리전 코드 (예: "kr1", "jp1" 등)
-tenant_id = "YOUR_TENANT_ID_HERE" # <-- 실제 테넌트 ID로 변경하세요
-
-# VPC and Subnet
-vpc_name = "my-python-vpc" # 생성할 VPC의 이름
-vpc_cidr = "10.0.0.0/16" # VPC의 CIDR
-subnet_name = "my-python-subnet" # 생성할 서브넷의 이름
-subnet_cidr = "10.0.1.0/24" # 서브넷의 CIDR (VPC CIDR 내에 있어야 합니다)
-
-# Security Group and Rules
-sg_name = "my-python-sg" # 생성할 보안 그룹의 이름
-sg_description = "Security group for web server and SSH access" # 보안 그룹 설명
-my_ip_for_ssh = "1.231.165.73/32" # <-- SSH 접근을 허용하기 위해 자신의 공인 IP 주소와 /32 접미사로 변경하세요.
-
-# Instance Configuration
-instance_name = "my-web-instance" # 생성할 인스턴스의 이름
-image_ref = "7342b6e2-74d6-4d2c-a65c-90242d1ee218" # <-- 사용할 이미지의 ID (예: Ubuntu Server 24.04.3 LTS)
-key_name = "yh_vm" # <-- NHN Cloud 프로젝트에 존재하는 키 페어의 이름으로 변경하세요.
-volume_size = 30 # 인스턴스에 할당할 볼륨 크기 (GB)
-
-# Nginx 설치 User Data 스크립트는 필요에 따라 수정하세요.
-# (Base64 인코딩을 통해 한글 인코딩 문제 해결)
-```
+> **참고:** `config.py` 파일은 VPC 이름, 인스턴스 이름 등 민감하지 않은 기본 설정을 포함하고 있습니다. 이 값들도 필요에 따라 수정할 수 있습니다.
 
 ## 7. 실행 방법
 

@@ -7,6 +7,7 @@ env/
 for_module/
 
 token.json
+.env
 
 test.py
 
